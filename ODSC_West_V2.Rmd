@@ -1,0 +1,184 @@
+---
+title: "R For Data Science"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
+
+### Data Exploration with R
+Most data exploration involves looking short subsets of data, generating statistical summaries, generating quick visualizations and running simple models. In R, a good bit of this can be conducted interactively with built-in, one line functions.
+
+The plots here are just a couple of exameples of the quick, very basic visualizations that a statistian or data scientist will make for herself with R basic graphics system. There are three plotting systems in R including the very popular ggplot2 graphics system. Base graphics plots are mostly very basic, however, with a little more work it is not difficult to make more sophisticated, pleasing plots.
+
+```{r}
+x <- rgamma(1000,1,.5) # Simulate 100 randow draws from a standard normal distribution
+head(x)
+summary(x)      # Generate a statistical summary of the numbers
+hist(x)         # Plot a histogram of the distribution
+boxplot(x)      # Look at a boxplot
+y <- x + rnorm(1000,2,10)
+plot(x,y)
+```
+
+Next, we build a simple regression model and examine the model object.
+```{r}
+model <- lm(y ~ x)
+summary(model)
+plot(model)
+str(model)
+```
+### R - A Functional, Object Based Language
+Everything that exists in R is an object
+
+R promotes encapsulation - separate but related data are packaged together.
+
+R classes are polymorphic - generic gunctions like plot and summary may have different methods for different objects or data structures
+
+Some basic interplary of functions and objects add a regression line to the scatter plot above.
+```{r}
+plot(x,y)
+abline(model, col = "red")
+```
+It is not much more difficult to draw more sophisticated looing simple plots using the either the additional plotting systems based on the lattice or ggplot2 graphic systems.
+yuu
+```{r}
+library(ggplot2)
+df <- data.frame(x,y)
+ggplot(df, aes(x,y)) + geom_point() + geom_smooth()
+```
+
+### Functions
+"A function is a group of instructions that takes inputs, uses them to compute other values, and returns the result" - Norm Matloff The Art of R Programming
+
+Let's write our own mean function  
+```{r}
+pemax <- c(95,85,100,85,95,80,65,110,70,95,110,90,100,80,134) #some data
+jmean <- function(x){
+	m <- sum(x)/length(x)	
+	return(m)
+}
+jmean(pemax)
+
+```
+Try again and improve the formatting
+```{r}
+jmean2 <- function(x){
+	m <- round(sum(x)/length(x),2)
+	return(m)
+}
+
+jmean2(pemax)
+```
+Why not give the user more control of the rounding process?   
+The magic 3 dots ... enable arguments to be passed to sub functions  
+
+```{r}
+jmean3 <- function(x,...){
+	m <- round(sum(x)/length(x),...)
+	return(m)
+}
+#?round						# look to see what parameters round is expecting
+
+jmean3(pemax,3)
+jmean3(pemax)				# the default value for round is 0
+jmean3(pemax,1)
+```  
+## Functions calling Functions  
+How about giving the user a choice about which rounding function to use?  
+Look at the difference between round() and signif().
+```{r}
+pi
+round(pi,4)
+signif(pi,4)
+```
+This is the way to have one function call an other function
+```{r}
+jmean4 <- function(x,FUN,...){
+	m <- FUN(sum(x)/length(x),...)
+	return(m)
+}
+jmean4(pemax,round,4)
+jmean4(pemax,signif,4)
+```
+### More Visualizations
+
+In some cases, specialized packages implement plots that work with specific kinds of data. Here is a specialized financial plot rendered in just a few lines of code.
+```{r}
+library(quantmod)
+
+# get S&P 500 data from FRED (St. Louis Fed)
+sp500 <- na.omit( 
+  getSymbols(
+    "SP500",
+    src = "FRED",
+    from = "1949-12-31",
+    auto.assign = FALSE
+  )
+)
+
+sp500.monthly <- sp500[endpoints(sp500, on ="months")]
+chartSeries(
+  sp500.monthly,
+  theme = chartTheme("white"),
+  TA = c(addBBands(),addTA(RSI(sp500.monthly)))
+)
+
+```
+
+### More sophisticated Graphics.
+Here we use data on the overflow of the Nile river to illustrate the the kinds of visualizations that can be made with ggplot2 and Javascript.
+```{r}
+library(ggplot2)            # for plotting functions
+# library(car)                # for the recode function, rc
+library(reshape2)           # for melt function to build long form data frame
+library(pracma)             # for Nile river data
+data(nile)
+head(nile)
+# Many data frames arenaturally in “wide” form. To plot this data with ggplot2 te data must be transformed into “long” form.
+nile_dat <- melt(nile,idvar="Year",measure.vars=month.abb,variable.name="Month",value.name="Obs")
+nile_dat_long <- nile_dat[with(nile_dat,order(Year,Month)),]         # sort
+
+# Make a date variable
+nile_dat_long$Date <- paste(with(nile_dat_long,Date<- paste(Month,"-","15","-",as.character(Year),sep="")))
+nile_dat_long$Date <- as.Date(nile_dat_long$Date,format="%b-%d-%Y")
+
+head(nile_dat_long)
+
+# Plot the time series
+p <- ggplot(nile_dat_long[100:300,],aes(x=Date,y=Obs))
+p + geom_line() + geom_point(shape=1,col="red") + 
+  ylab("Flow in cubic meters / second") + 
+  ggtitle("Monthly Flow of Nile River at Dongola Station")
+
+# Boxplots of monthly flows
+b <- ggplot(nile_dat_long,aes(factor(Month),Obs))
+b + geom_boxplot() +
+  xlab("Month") +
+  ylab("Flow in cubic meters / second") + 
+  ggtitle("Variation of Flow at Dongola Station by Month")
+```  
+### Create an interactive graph with a Javascript library
+```{r}
+library(xts)
+library(dygraphs)
+# Make into a time series object
+nile_ts <- xts(nile_dat_long$Obs,
+               order.by=nile_dat_long$Date,
+               frequency=12,start=c(1871,1))
+
+# Plot wit htmlwidget dygraph
+dygraph(nile_ts,ylab="cubic m / s", 
+        main="Nile Monthly Flow Data") %>%
+  dySeries("V1",label="Flow") %>%
+  dyRangeSelector(dateWindow = c("1871-01-01","1984-12-01"))
+```

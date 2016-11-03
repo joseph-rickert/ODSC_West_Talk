@@ -1,0 +1,59 @@
+---
+title: "XML Example"
+output: html_notebook
+---
+In this Notebook we provide a brief example of using R to search an XML document. This example comes directly from Chapter 11 "CIA Factbook Mashup" of the text "Data Science in R: A Case Studies approach to Computational Reasoning and Problem Solving" by Deborah Nolan and Dncan Temple Lang, CRC Press. The CIA Factbook Data can be downloaded from: 
+http://jmatchparser.sourceforge.net/factbook/data/factbook.xml.gz
+
+### Excerpt from the CIA Factbook XML file
+```
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><factbook lastupdate="2014-06-24+02:00"><news date="2014-06-26+02:00">There are dozens of monarchies scattered about the globe, bu only one of them falls in the Pacific region (Oceania). Can you name this arhcipelagic country? Hint: It lies in western Polynesia and was formerly referred to as the Friendly Islands. Its capital is Nuku'alofa, which translates as &quot;the abode of love.&quot;</news><news date="2014-06-19+02:00">Many people don't realize it, but the International Criminal Police Organization (Interpol) has been around for more than nine decades (founded 1923). How many countries are members? Check Appendix B – International Organizations and Groups to find out.</news><news date="2014-06-12+02:00">
+
+dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="au"/><rank number="4.00" dateEstimated="false" dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="sw"/><rank number="4.00" dateEstimated="false" dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="it"/><rank number="4.00" dateEstimated="false" dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="bo"/><rank number="3.00" dateEstimated="false" dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="sn"/><rank number="3.00" dateEstimated="false" dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="gr"/><rank number="2.00" dateEstimated="false" dateLatest="2010-12-31" dateEarliest="2010-01-01" dateText="2010" country="en"/></field><field dollars="false" unit="(deaths/1,000 live births)" rankorder="1" name="Infant mortality rate" id="f2091"><description>This entry gives the number of deaths of infants under one year old in a given year per 1,000 live births in the same year. This rate is often used as an indicator of the level of health in a country.</description><rank number="117.23" dateEstimated="true" dateLatest="2014-12-31" dateEarliest="2014-01-01" dateText="2014 est." country="af"/><rank number="104.34" dateEstimated="true" dateLatest="2014-12-31" dateEarliest="2014-01-01" dateText="2014 est." country="ml"/><rank number="100.14" dateEstimated="true" dateLatest="2014-12-31" dateEarliest="2014-01-01" dateText="2014 est." country="so"/><rank number="92.86" dateEstimated="true" dateLatest="2014-12-31" dateEarliest="2014-01-01" dateText="2014 est." country="ct"/><rank number="90.92" 
+```
+From trial and error, and a little bit of searching we discover that information on infant mortality is contained in a <field> node which has an id attribute value of "f2091"
+
+The rest of the notebook shows how to go about searching for infant mortality data using basic R functions to parse and search the XML document tree
+```{r}
+library(XML)
+#url <- "http://jmatchparser.sourceforge.net/factbook/data/factbook.xml.gz"
+file <- file.path(getwd(),"factbook.xml")
+factbookDoc <- xmlParse(file)
+factbookRoot <- xmlRoot(factbookDoc)
+
+xmlName(factbookRoot) # confirm file
+xmlSize(factbookRoot) # Find names of child nodes
+table(names(factbookRoot))
+# Go hunting for relevant data in the file
+sapply(factbookRoot["category"],function(node) table(names(node)))
+# Examine the attributes on the category nodes
+sapply(factbookRoot["category"],xmlAttrs)
+```
+The "people and Scoiety" category looks interesting. We examine the id attribute values of all of its field children.
+```{r}
+categoryNodes <- factbookRoot["category"]
+class(categoryNodes)
+length(categoryNodes)
+str(categoryNodes)
+categoryNodes[[1]][1]
+categoryNodes[[1]][2]
+
+w <- sapply(categoryNodes,xmlGetAttr,"name") == "People and Society"
+# Extract value of the id attributes of this node's chileren
+Ids <- sapply(categoryNodes[[which(w)]]["field"],xmlGetAttr,"id")
+# Search for the attribute value f2091 discovered above
+f2091Index <- which(Ids == "f2091")
+f2091Index
+```
+The desired node is the 17th <field> node of the "People and Society" <category> node
+```{r}
+# Find country and attribute values on the <rank> nodes
+rankNodes <- categoryNodes[[which(w)]]["field"][[f2091Index]]["rank"]
+xmlSize(rankNodes)
+# Retrieve the valyes of the number and country attributes
+infMortNum <- sapply(rankNodes,xmlGetAttr,"number")
+head(infMortNum)
+infMortCtry <- sapply(rankNodes,xmlGetAttr,"country")
+head(infMortCtry)
+```
+
